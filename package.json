@@ -29,5 +29,8 @@
   "bugs": {
     "url": "https://github.com/random-access-storage/random-access-chrome-file/issues"
   },
-  "homepage": "https://github.com/random-access-storage/random-access-chrome-file"
+  "homepage": "https://github.com/random-access-storage/random-access-chrome-file",
+  "publishConfig": {
+    "access": "public"
+  }
 }
