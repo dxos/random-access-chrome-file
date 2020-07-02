@@ -152,7 +152,7 @@ WriteRequest.prototype.onwrite = function (err, e) {
   }
 
   if (!err) {
-    this.file.updateSize(e.currentTarget.length)
+    this.file.updateSize(e.currentTarget.length, this.truncating)
   }
 
   if (this.truncating) {
@@ -166,7 +166,6 @@ WriteRequest.prototype.onwrite = function (err, e) {
 
 WriteRequest.prototype.truncate = function () {
   this.truncating = true
-  this.file.truncate()
   this.writer.truncate(this.req.offset)
 }
 
@@ -181,9 +180,7 @@ WriteRequest.prototype.run = function (req) {
     if (err) return req.callback(err)
 
     this.req = req
-    if (!this.writer) {
-      return this.makeWriter()
-    }
+    if (!this.writer || this.writer.length !== file.size) return this.makeWriter()
 
     const end = req.offset + req.size
     if (end > file.size && !this.lock()) return
@@ -251,7 +248,10 @@ ReadRequest.prototype.onread = function (err, buf) {
   const req = this.req
 
   if (err && this.retry) {
-    this.retry = false
+    if (err.code !== 0) {
+      this.retry = false
+    }
+
     if (this.lock(this)) {
       this.file.clearFile()
       this.run(req)
@@ -288,23 +288,18 @@ class EntryFile {
     this._lock = mutexify()
     this._file = null
     this._size = 0
-    this._truncated = false
   }
 
   get size () {
     return this._size
   }
 
-  updateSize (size) {
-    if (!this._truncated) {
+  updateSize (size, truncating) {
+    if (truncating || size > this._size) {
       this._size = size
     }
 
     this.clearFile()
-  }
-
-  truncate () {
-    this._truncated = true
   }
 
   clearFile () {
@@ -312,17 +307,16 @@ class EntryFile {
   }
 
   get (cb) {
-    if (this._file && !this._truncated) {
+    if (this._file) {
       return cb(null, this._file)
     }
 
     this._lock(release => {
-      if (this._file && !this._truncated) {
+      if (this._file) {
         return release(cb, null, this._file)
       }
 
       this._entry.file(file => {
-        this._truncated = false
         this._file = file
         this._size = file.size
         release(cb, null, file)
@@ -331,10 +325,6 @@ class EntryFile {
   }
 
   getWritableFile (cb) {
-    if (!this._truncated) {
-      return cb(null, this)
-    }
-
-    this.get(cb)
+    return cb(null, this)
   }
 }
