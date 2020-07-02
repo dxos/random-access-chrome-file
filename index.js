@@ -152,7 +152,7 @@ WriteRequest.prototype.onwrite = function (err, e) {
   }
 
   if (!err) {
-    this.file.updateSize(e.currentTarget.length, this.truncating)
+    this.file.updateSize(e.currentTarget.length)
   }
 
   if (this.truncating) {
@@ -166,6 +166,7 @@ WriteRequest.prototype.onwrite = function (err, e) {
 
 WriteRequest.prototype.truncate = function () {
   this.truncating = true
+  this.file.truncate()
   this.writer.truncate(this.req.offset)
 }
 
@@ -288,18 +289,23 @@ class EntryFile {
     this._lock = mutexify()
     this._file = null
     this._size = 0
+    this._truncated = false
   }
 
   get size () {
     return this._size
   }
 
-  updateSize (size, truncating) {
-    if (truncating || size > this._size) {
+  updateSize (size) {
+    if (!this._truncated && size > this._size) {
       this._size = size
     }
 
     this.clearFile()
+  }
+
+  truncate () {
+    this._truncated = true
   }
 
   clearFile () {
@@ -307,16 +313,17 @@ class EntryFile {
   }
 
   get (cb) {
-    if (this._file) {
+    if (this._file && !this._truncated) {
       return cb(null, this._file)
     }
 
     this._lock(release => {
-      if (this._file) {
+      if (this._file && !this._truncated) {
         return release(cb, null, this._file)
       }
 
       this._entry.file(file => {
+        this._truncated = false
         this._file = file
         this._size = file.size
         release(cb, null, file)
@@ -325,6 +332,10 @@ class EntryFile {
   }
 
   getWritableFile (cb) {
-    return cb(null, this)
+    if (!this._truncated) {
+      return cb(null, this)
+    }
+
+    this.get(cb)
   }
 }
