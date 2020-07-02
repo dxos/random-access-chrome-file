@@ -181,7 +181,9 @@ WriteRequest.prototype.run = function (req) {
     if (err) return req.callback(err)
 
     this.req = req
-    if (!this.writer || this.writer.length !== file.size) return this.makeWriter()
+    if (!this.writer) {
+      return this.makeWriter()
+    }
 
     const end = req.offset + req.size
     if (end > file.size && !this.lock()) return
