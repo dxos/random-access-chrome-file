@@ -1,6 +1,6 @@
 {
   "name": "@dxos/random-access-chrome-file",
-  "version": "2.0.0-beta.1",
+  "version": "2.0.0-beta.2",
   "description": "random-access-storage instance backed by the Chrome file system api.",
   "main": "index.js",
   "dependencies": {
